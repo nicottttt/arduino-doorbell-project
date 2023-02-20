@@ -2,7 +2,6 @@
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
-#include <dht11.h>
 
 #define BTN D6
 volatile int detect=0;
@@ -11,13 +10,13 @@ int state=0;
 int pre_state=1;
 const char* payload;
 char present_time[20];
-boolean connectedFlag=0;
-dht11 DHT11;
+String payload_from_topic;
 
 WiFiClient wifiClient;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP); //NTP地址
 PubSubClient mqttClient(wifiClient);
+
 //const char* mqttBroker="test.mosquitto.org";
 void changeState(){
   state=state+1;
@@ -31,30 +30,27 @@ void connec_broker(){
   mqttClient.setServer(mqttBroker, 1884);  // or the port in which the broker is listening
   while (!mqttClient.connected()) {
     if (mqttClient.connect("esp8266-mqtt-client")) {  // esp8266-mqtt-client is your mqtt client id, feel free to change it
-      Serial.println("Connected to MQTT broker.\n");
-      connectedFlag=1;
-      
+      Serial.println("Connected to MQTT broker.\n");     
     } else {
       Serial.println("Unable to connect to MQTT broker, retrying..."); 	// you can display the error code with mqttClient.state()
       delay(3000);		// retry after 3 sec
     }
   }
-  //initial the time
-  timeClient.update();
-  timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
   
 }
 
-
+//回调函数
 void callback(char *topic, byte *payload, unsigned int length) {
     Serial.print("Message arrived in topic: ");//打印
     Serial.println(topic);//主题
     Serial.print("Message:");
     for (int i = 0; i < length; i++) {
-        Serial.print((char) payload[i]);//内容转成字符串     byte >> char  >> string
+      payload_from_topic+=(char) payload[i];//内容转成字符串     byte >> char  >> string
     }
+    Serial.println(payload_from_topic);
     Serial.println();
     Serial.println("-----------END------------");
+    payload_from_topic="";
 }
 
 void setup() {
@@ -74,35 +70,21 @@ void setup() {
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
 
-  //ntp:
+  //initial the time
   timeClient.begin();
   timeClient.setTimeOffset(3600); //British time, in France must +1(+3600)
+  timeClient.update();
+  timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
 
+  //connect to the broker and subscribe to the topic
   connec_broker();
   mqttClient.setCallback(callback);
-  mqttClient.subscribe("nico/request");
-  Serial.println("Subscribed to testTopic"); // Print a message after subscribing
+  mqttClient.subscribe("nico/student");//the student can post the msg through this topic
+  mqttClient.subscribe("nico/professor");//the professor can post the msg through this topic
 }
-
-
 
 void loop() {
   mqttClient.loop();
-  
-  //ntp test:
-  
-  // timeClient.update();
-  // timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
-  // Serial.print("aa:");
-  // Serial.print(present_time);
-  // Serial.print("\n");
-  // delay(5000);
-  
-  if(connectedFlag==0){
-    connec_broker();
-  }
-  
-  
 
   if(!digitalRead(BTN)){//read the btn
     while(1){
@@ -114,8 +96,7 @@ void loop() {
     Serial.print("change state\n");
   }
 
-  
-  if(pre_state!=state){
+  if(pre_state!=state){//if some of the status changes, the nodeMCU can publish the msg to the topic 
     switch(state){
       case 0: 
         payload="Present";
@@ -127,9 +108,8 @@ void loop() {
         payload="busy";
         break;
     }
-    mqttClient.publish("nico/topic", payload);//the last para is const char* !!!
-    mqttClient.publish("nico/topic", present_time);
-    
+    mqttClient.publish("nico/public", payload);//the last para is const char* !!!
+    mqttClient.publish("nico/public", present_time);
   }
 
   pre_state=state;
