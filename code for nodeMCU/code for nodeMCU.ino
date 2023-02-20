@@ -1,16 +1,22 @@
+#include <NTPClient.h>
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
 #include <dht11.h>
+
 #define BTN D6
 volatile int detect=0;
 volatile int toggle=0;
 int state=0;
 int pre_state=1;
 const char* payload;
+char present_time[20];
 boolean connectedFlag=0;
 dht11 DHT11;
 
 WiFiClient wifiClient;
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP); //NTP地址
 PubSubClient mqttClient(wifiClient);
 //const char* mqttBroker="test.mosquitto.org";
 
@@ -39,6 +45,11 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
+
+  //ntp:
+  timeClient.begin();
+  timeClient.setTimeOffset(3600); //British time, in France must +1(+3600)
+
 }
 
 void connec_broker(){
@@ -56,6 +67,15 @@ void connec_broker(){
 }
 
 void loop() {
+  //ntp test:
+  
+  // timeClient.update();
+  // timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
+  // Serial.print("aa:");
+  // Serial.print(present_time);
+  // Serial.print("\n");
+  // delay(5000);
+  
   if(connectedFlag==0){
     connec_broker();
   }
@@ -64,8 +84,10 @@ void loop() {
     while(1){
       if(digitalRead(BTN)){break;}
     }
+    timeClient.update();
+    timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
     changeState();
-    Serial.print("change state");
+    Serial.print("change state\n");
   }
 
   
@@ -82,8 +104,8 @@ void loop() {
         break;
     }
     mqttClient.publish("nico/topic", payload);//the last para is const char* !!!
+    mqttClient.publish("nico/topic", present_time);
   }
 
   pre_state=state;
-  //delay(5000);
 }
