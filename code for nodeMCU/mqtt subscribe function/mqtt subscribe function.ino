@@ -19,14 +19,42 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP); //NTP地址
 PubSubClient mqttClient(wifiClient);
 //const char* mqttBroker="test.mosquitto.org";
-
-
-
 void changeState(){
   state=state+1;
   if(state==3){
     state=0;
   }
+}
+
+void connec_broker(){
+  IPAddress mqttBroker(172,20,10,6);
+  mqttClient.setServer(mqttBroker, 1884);  // or the port in which the broker is listening
+  while (!mqttClient.connected()) {
+    if (mqttClient.connect("esp8266-mqtt-client")) {  // esp8266-mqtt-client is your mqtt client id, feel free to change it
+      Serial.println("Connected to MQTT broker.\n");
+      connectedFlag=1;
+      
+    } else {
+      Serial.println("Unable to connect to MQTT broker, retrying..."); 	// you can display the error code with mqttClient.state()
+      delay(3000);		// retry after 3 sec
+    }
+  }
+  //initial the time
+  timeClient.update();
+  timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
+  
+}
+
+
+void callback(char *topic, byte *payload, unsigned int length) {
+    Serial.print("Message arrived in topic: ");//打印
+    Serial.println(topic);//主题
+    Serial.print("Message:");
+    for (int i = 0; i < length; i++) {
+        Serial.print((char) payload[i]);//内容转成字符串     byte >> char  >> string
+    }
+    Serial.println();
+    Serial.println("-----------END------------");
 }
 
 void setup() {
@@ -50,30 +78,17 @@ void setup() {
   timeClient.begin();
   timeClient.setTimeOffset(3600); //British time, in France must +1(+3600)
 
+  connec_broker();
+  mqttClient.setCallback(callback);
+  mqttClient.subscribe("nico/request");
+  Serial.println("Subscribed to testTopic"); // Print a message after subscribing
 }
 
-void connec_broker(){
-  IPAddress mqttBroker(172,20,10,6);
-  mqttClient.setServer(mqttBroker, 1884);  // or the port in which the broker is listening
-  while (!mqttClient.connected()) {
-    if (mqttClient.connect("esp8266-mqtt-client")) {  // esp8266-mqtt-client is your mqtt client id, feel free to change it
-      Serial.println("Connected to MQTT broker.\n");
-      connectedFlag=1;
-    } else {
-      Serial.println("Unable to connect to MQTT broker, retrying..."); 	// you can display the error code with mqttClient.state()
-      delay(3000);		// retry after 3 sec
-    }
-  }
-  //initial the time
-  timeClient.update();
-  timeClient.getFormattedTime().toCharArray(present_time,20);//get the time
 
-  mqttClient.subscribe("nico/topic");
-}
 
 void loop() {
-
   mqttClient.loop();
+  
   //ntp test:
   
   // timeClient.update();
@@ -86,6 +101,8 @@ void loop() {
   if(connectedFlag==0){
     connec_broker();
   }
+  
+  
 
   if(!digitalRead(BTN)){//read the btn
     while(1){
