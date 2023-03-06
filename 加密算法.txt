@@ -1,0 +1,50 @@
+// 加密函数
+void encryptData(byte* data, int dataLength, byte* key, int keyLength) {
+  for (int i = 0; i < dataLength; i++) {
+    data[i] = data[i] ^ key[i % keyLength];
+  }
+}
+
+// 解密函数
+void decryptData(byte* data, int dataLength, byte* key, int keyLength) {
+  for (int i = 0; i < dataLength; i++) {
+    data[i] = data[i] ^ key[i % keyLength];
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+  
+  // 待加密的数据和密钥
+  byte data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
+  byte key[] = {0xAA, 0xBB, 0xCC, 0xDD};
+  
+  int dataLength = sizeof(data) / sizeof(data[0]);
+  int keyLength = sizeof(key) / sizeof(key[0]);
+  
+  // 加密数据
+  encryptData(data, dataLength, key, keyLength);
+  
+  // 打印加密后的数据
+  Serial.println("Encrypted data:");
+  for (int i = 0; i < dataLength; i++) {
+    Serial.print(data[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+  
+  // 解密数据
+  decryptData(data, dataLength, key, keyLength);
+  
+  // 打印解密后的数据
+  Serial.println("Decrypted data:");
+  for (int i = 0; i < dataLength; i++) {
+    Serial.print(data[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+}
+
+void loop() {
+  // 程序循环体为空
+}
